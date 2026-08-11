@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>minimax-h3</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjNjM2NmYxIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTg1NWY3Ii8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3QgeD0iNCIgeT0iNCIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iMTUiIGZpbGw9InVybCgjZykiLz48cGF0aCBkPSJNMjcgMjEuNSBMNDUgMzIgTDI3IDQyLjUgWiIgZmlsbD0iI2ZmZmZmZiIvPjwvc3ZnPg==">
+<style>
+  :root {
+    --bg: #0a0b10;
+    --card: rgba(255, 255, 255, 0.028);
+    --card-solid: #11141c;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.14);
+    --text: #eceef2;
+    --text-2: #9aa1ad;
+    --text-3: #6b7280;
+    --accent: #6366f1;
+    --accent-2: #a855f7;
+    --danger: #f87171;
+    --success: #34d399;
+    --radius: 12px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { color-scheme: dark; }
+  body {
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+                 "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    background-image:
+      radial-gradient(900px 500px at 15% -10%, rgba(99, 102, 241, 0.12), transparent 60%),
+      radial-gradient(800px 500px at 85% -10%, rgba(168, 85, 247, 0.10), transparent 60%);
+    background-attachment: fixed;
+  }
+
+  /* ---------- 顶栏 ---------- */
+  .topbar { border-bottom: 1px solid var(--border);
+            background: rgba(10, 11, 16, 0.72); backdrop-filter: blur(12px);
+            position: sticky; top: 0; z-index: 10; }
+  .topbar-inner { max-width: 980px; margin: 0 auto; padding: 0 24px; height: 60px;
+                  display: flex; justify-content: space-between; align-items: center; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand svg { width: 26px; height: 26px; display: block; }
+  .brand .name { font-size: 15px; font-weight: 650; letter-spacing: .3px; }
+  .brand .name em { font-style: normal;
+    background: linear-gradient(90deg, #818cf8, #c084fc);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .userbar { font-size: 13px; color: var(--text-2); display: flex;
+             align-items: center; gap: 14px; }
+  .userbar .uname { color: var(--text); }
+  .userbar .role { font-size: 11px; color: #c084fc; border: 1px solid rgba(168,85,247,.35);
+                   padding: 1px 8px; border-radius: 999px; }
+
+  .container { max-width: 980px; margin: 0 auto; padding: 28px 24px 72px; }
+
+  /* ---------- 卡片 ---------- */
+  .card { background: var(--card); border: 1px solid var(--border);
+          border-radius: var(--radius); padding: 26px 28px; margin-bottom: 18px;
+          backdrop-filter: blur(6px); }
+  .card-title { font-size: 15px; font-weight: 600; letter-spacing: .2px;
+                margin-bottom: 18px; padding-bottom: 14px;
+                border-bottom: 1px solid var(--border);
+                display: flex; align-items: baseline; gap: 10px; }
+  .card-title .sub { font-size: 12px; color: var(--text-3); font-weight: 400; }
+
+  /* ---------- 表单 ---------- */
+  label { display: block; font-size: 12.5px; color: var(--text-2);
+          margin: 16px 0 7px; letter-spacing: .2px; }
+  input[type=text], input[type=password], textarea, select {
+    width: 100%; background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-strong); border-radius: 8px;
+    color: var(--text); padding: 10px 13px; font-size: 14px; outline: none;
+    transition: border-color .15s, box-shadow .15s; }
+  input:focus, textarea:focus, select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18); }
+  select option { background: var(--card-solid); color: var(--text); }
+  select { width: auto; min-width: 150px; max-width: min(100%, 320px); padding-right: 34px; }
+  textarea { resize: vertical; min-height: 110px; line-height: 1.7; }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .row > div { flex: 0 1 auto; min-width: 0; max-width: 100%; }
+  @media (max-width: 640px) { .row { flex-direction: column; gap: 0; } }
+
+  /* ---------- 按钮 ---------- */
+  .btn { background: linear-gradient(135deg, var(--accent), var(--accent-2));
+         color: #fff; border: none; border-radius: 8px; padding: 10px 28px;
+         font-size: 14px; font-weight: 550; cursor: pointer; letter-spacing: .3px;
+         transition: transform .12s, box-shadow .15s, opacity .15s;
+         box-shadow: 0 4px 18px rgba(99, 102, 241, 0.25); }
+  .btn:hover { transform: translateY(-1px);
+               box-shadow: 0 6px 24px rgba(99, 102, 241, 0.38); }
+  .btn:disabled { background: #3a3f4d; box-shadow: none; cursor: not-allowed;
+                  transform: none; }
+  .btn-ghost { background: transparent; border: 1px solid var(--border-strong);
+               color: var(--text-2); padding: 5px 14px; font-size: 13px;
+               border-radius: 8px; cursor: pointer; transition: all .15s; }
+  .btn-ghost:hover { border-color: var(--accent); color: #c7d2fe; }
+
+  /* ---------- 登录页 ---------- */
+  .auth-wrap { max-width: 400px; margin: 7vh auto 0; }
+  .auth-logo { text-align: center; margin-bottom: 26px; }
+  .auth-logo svg { width: 52px; height: 52px; }
+  .auth-logo .t { font-size: 19px; font-weight: 650; margin-top: 12px; letter-spacing: .3px; }
+  .auth-logo .d { font-size: 13px; color: var(--text-3); margin-top: 5px; }
+  .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 6px; }
+  .tabs button { background: transparent; border: none; color: var(--text-2);
+                 font-size: 14px; padding: 10px 4px; margin-right: 26px; cursor: pointer;
+                 border-bottom: 2px solid transparent; margin-bottom: -1px;
+                 transition: color .15s; }
+  .tabs button.active { color: #c7d2fe; border-bottom-color: var(--accent); font-weight: 600; }
+
+  /* ---------- 任务 ---------- */
+  .job { border: 1px solid var(--border); border-radius: var(--radius);
+         padding: 18px 20px; margin-bottom: 14px;
+         background: rgba(255, 255, 255, 0.02);
+         animation: fadeIn .3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+  .job .prompt { font-size: 14px; line-height: 1.75; margin-bottom: 12px;
+                 word-break: break-word; white-space: pre-wrap; color: #d7dae0; }
+  .job .meta { font-size: 12px; color: var(--text-3); display: flex; gap: 14px;
+               flex-wrap: wrap; align-items: center; line-height: 1.9; }
+  .badge { display: inline-flex; align-items: center; gap: 6px;
+           padding: 3px 11px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+  .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .badge.pending  { background: rgba(251, 191, 36, 0.10); color: #fbbf24; }
+  .badge.running  { background: rgba(99, 102, 241, 0.14); color: #a5b4fc; }
+  .badge.running::before { animation: pulse 1.2s ease infinite; }
+  @keyframes pulse { 50% { opacity: .3; } }
+  .badge.completed{ background: rgba(52, 211, 153, 0.10); color: #34d399; }
+  .badge.failed   { background: rgba(248, 113, 113, 0.10); color: #f87171; }
+  .tag { font-size: 12px; color: var(--text-2); background: rgba(255,255,255,.05);
+         border: 1px solid var(--border); padding: 2px 9px; border-radius: 6px; }
+  video { width: 100%; border-radius: 8px; margin-top: 14px; background: #000;
+          border: 1px solid var(--border); }
+  .job a.dl { font-size: 13px; color: #a5b4fc; text-decoration: none;
+              display: inline-block; margin-top: 10px; }
+  .job a.dl:hover { text-decoration: underline; }
+  .empty { font-size: 13px; color: var(--text-3); padding: 30px 0; text-align: center; }
+
+  .msg { font-size: 13px; margin-top: 12px; min-height: 18px; }
+  .msg.err { color: var(--danger); }
+  .msg.ok { color: var(--success); }
+  .meta-text { font-size: 12px; color: var(--text-3); margin-top: 12px; line-height: 1.8; }
+  .hidden { display: none; }
+
+  /* ---------- 用户列表（管理员） ---------- */
+  .utable { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .utable th { text-align: left; font-weight: 500; color: var(--text-3);
+               font-size: 12px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  .utable td { padding: 10px; border-bottom: 1px solid var(--border); color: #d7dae0; }
+  .utable tr:last-child td { border-bottom: none; }
+  .urole { font-size: 11px; color: #c084fc; border: 1px solid rgba(168,85,247,.35);
+           padding: 1px 8px; border-radius: 999px; margin-left: 8px; }
+  #jobScopeTabs button { font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <svg viewBox="0 0 64 64"><defs><linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs><rect x="4" y="4" width="56" height="56" rx="15" fill="url(#lg1)"/><path d="M27 21.5 L45 32 L27 42.5 Z" fill="#fff"/></svg>
+      <span class="name"><em id="siteName">minimax-h3</em></span>
+    </div>
+    <div class="userbar hidden" id="userbar">
+      <span class="uname" id="whoami"></span>
+      <button class="btn-ghost" onclick="logout()">退出登录</button>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- 登录/注册 -->
+  <div class="auth-wrap" id="authCard">
+    <div class="auth-logo">
+      <svg viewBox="0 0 64 64"><defs><linearGradient id="lg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs><rect x="4" y="4" width="56" height="56" rx="15" fill="url(#lg2)"/><path d="M27 21.5 L45 32 L27 42.5 Z" fill="#fff"/></svg>
+      <div class="t">minimax-h3</div>
+      <div class="d">本地部署 · 音视频同生模型 · 队列化生成服务</div>
+    </div>
+    <div class="card">
+      <div class="tabs">
+        <button id="tabLogin" class="active" onclick="switchTab('login')">登录</button>
+        <button id="tabReg" onclick="switchTab('reg')">注册</button>
+      </div>
+      <label>用户名</label>
+      <input type="text" id="username" placeholder="字母、数字、下划线">
+      <label>密码</label>
+      <input type="password" id="password" placeholder="至少 6 位">
+      <div id="inviteRow" class="hidden">
+        <label>邀请码</label>
+        <input type="text" id="inviteCode" placeholder="如有邀请码请填写">
+      </div>
+      <div style="margin-top:22px">
+        <button class="btn" id="authBtn" onclick="doAuth()" style="width:100%">登录</button>
+      </div>
+      <div class="msg" id="authMsg"></div>
+    </div>
+  </div>
+
+  <!-- 提交任务 -->
+  <div class="card hidden" id="submitCard">
+    <div class="card-title">新建生成任务 <span class="sub">提交后进入队列，按序生成</span></div>
+    <label>视频描述（提示词）</label>
+    <textarea id="prompt" placeholder="描述画面内容、镜头运动、风格与声音。例如：一只橘猫在舞台聚光灯下弹钢琴，镜头缓慢推近，电影感，伴随轻柔的钢琴声。"></textarea>
+    <div class="row">
+      <div>
+        <label>引擎</label>
+        <select id="engine">
+          <option value="turbo">极速 Turbo（8 步）</option>
+          <option value="standard">品质 Standard（20 步）</option>
+        </select>
+      </div>
+      <div>
+        <label>分辨率</label>
+        <select id="size">
+          <option value="864x480">864 × 480</option>
+          <option value="1280x736">1280 × 736</option>
+        </select>
+      </div>
+      <div>
+        <label>时长</label>
+        <select id="seconds">
+          <option value="5">5 秒</option>
+          <option value="10">10 秒</option>
+          <option value="15">15 秒</option>
+        </select>
+      </div>
+    </div>
+    <div class="meta-text">参考耗时：极速 5 秒档约 6~8 分钟，品质档约 45 分钟起；10 秒约 2 倍，15 秒约 3 倍。</div>
+    <div style="margin-top:22px">
+      <button class="btn" id="submitBtn" onclick="submitJob()">提交生成</button>
+    </div>
+    <div class="msg" id="submitMsg"></div>
+    <div class="meta-text" id="quotaText"></div>
+    <div class="meta-text">生成需要数分钟至数十分钟，提交后可在下方任务列表查看进度。生成内容带有 AI 标识，请遵守相关法律法规与平台规范。</div>
+  </div>
+
+  <!-- 任务列表 -->
+  <div class="card hidden" id="jobsCard">
+    <div class="card-title">任务列表
+      <span class="sub" id="pendingInfo"></span>
+      <span class="tabs hidden" id="jobScopeTabs" style="margin-left:auto;border:none">
+        <button class="active" id="tabMine" onclick="switchScope(false)" style="padding:2px 10px;margin-right:8px">我的任务</button>
+        <button id="tabAll" onclick="switchScope(true)" style="padding:2px 10px">全部任务</button>
+      </span>
+    </div>
+    <div id="jobList"><div class="empty">暂无任务</div></div>
+  </div>
+
+  <!-- 用户列表（管理员） -->
+  <div class="card hidden" id="usersCard">
+    <div class="card-title">注册用户 <span class="sub" id="usersInfo"></span></div>
+    <div id="userList"><div class="empty">暂无用户</div></div>
+  </div>
+</div>
+
+<script>
+let mode = 'login';
+let me = null;
+
+function switchTab(m) {
+  mode = m;
+  document.getElementById('tabLogin').classList.toggle('active', m === 'login');
+  document.getElementById('tabReg').classList.toggle('active', m === 'reg');
+  document.getElementById('authBtn').textContent = m === 'login' ? '登录' : '注册';
+  document.getElementById('inviteRow').classList.toggle('hidden', m === 'login');
+  setMsg('authMsg', '');
+}
+
+function setMsg(id, text, ok) {
+  const el = document.getElementById(id);
+  el.textContent = text || '';
+  el.className = 'msg ' + (text ? (ok ? 'ok' : 'err') : '');
+}
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  let data = {};
+  try { data = await r.json(); } catch (e) {}
+  if (!r.ok) {
+    let msg = data.detail;
+    if (Array.isArray(msg))
+      msg = msg.map(x => (x.loc || []).join('.') + ': ' + x.msg).join('；');
+    else if (msg && typeof msg === 'object')
+      msg = JSON.stringify(msg);
+    throw new Error(msg || ('请求失败 ' + r.status));
+  }
+  return data;
+}
+
+async function doAuth() {
+  const body = {
+    username: document.getElementById('username').value.trim(),
+    password: document.getElementById('password').value,
+    invite_code: document.getElementById('inviteCode').value.trim()
+  };
+  if (!body.username || !body.password) { setMsg('authMsg', '请填写用户名和密码'); return; }
+  try {
+    await api('/api/' + (mode === 'login' ? 'login' : 'register'), {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    await boot();
+  } catch (e) { setMsg('authMsg', e.message); }
+}
+
+async function logout() {
+  await fetch('/api/logout', {method: 'POST'});
+  location.reload();
+}
+
+async function boot() {
+  try {
+    me = await api('/api/me');
+  } catch (e) {
+    document.getElementById('authCard').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('authCard').classList.add('hidden');
+  document.getElementById('submitCard').classList.remove('hidden');
+  document.getElementById('jobsCard').classList.remove('hidden');
+  document.getElementById('userbar').classList.remove('hidden');
+  document.getElementById('whoami').innerHTML = me.username +
+    (me.is_admin ? ' <span class="role">管理员</span>' : '');
+  document.getElementById('siteName').textContent = me.site_name || 'minimax-h3';
+  document.title = me.site_name || 'minimax-h3';
+  if (me.is_admin) {
+    document.getElementById('jobScopeTabs').classList.remove('hidden');
+    document.getElementById('usersCard').classList.remove('hidden');
+    loadUsers();
+  }
+  updateQuota();
+  refreshJobs();
+}
+
+// ---------- 管理员：用户列表 / 全站任务 ----------
+let adminAll = false;
+
+function switchScope(all) {
+  adminAll = all;
+  document.getElementById('tabMine').classList.toggle('active', !all);
+  document.getElementById('tabAll').classList.toggle('active', all);
+  lastJobsSig = '';   // 强制重绘
+  refreshJobs();
+}
+
+async function loadUsers() {
+  try {
+    const data = await api('/api/admin/users');
+    const el = document.getElementById('userList');
+    document.getElementById('usersInfo').textContent = '共 ' + data.users.length + ' 人';
+    if (!data.users.length) { el.innerHTML = '<div class="empty">暂无用户</div>'; return; }
+    el.innerHTML = '<table class="utable"><tr>' +
+      '<th>ID</th><th>用户名</th><th>注册时间</th><th>任务数</th><th>已完成</th></tr>' +
+      data.users.map(u =>
+        '<tr><td>' + u.id + '</td>' +
+        '<td>' + escapeHtml(u.username) + (u.is_admin ? '<span class="urole">管理员</span>' : '') + '</td>' +
+        '<td>' + fmtTime(u.created_at) + '</td>' +
+        '<td>' + u.jobs_total + '</td>' +
+        '<td>' + u.jobs_done + '</td></tr>').join('') +
+      '</table>';
+  } catch (e) {}
+}
+
+function updateQuota() {
+  document.getElementById('quotaText').textContent =
+    (me.quota_per_day > 0)
+      ? '今日已用 ' + me.used_today + ' / ' + me.quota_per_day + ' 次'
+      : '今日已生成 ' + me.used_today + ' 次 · 不限额度';
+}
+
+async function submitJob() {
+  const btn = document.getElementById('submitBtn');
+  const body = {
+    prompt: document.getElementById('prompt').value.trim(),
+    size: document.getElementById('size').value,
+    seconds: parseInt(document.getElementById('seconds').value),
+    engine: document.getElementById('engine').value
+  };
+  if (!body.prompt) { setMsg('submitMsg', '请填写视频描述'); return; }
+  btn.disabled = true;
+  try {
+    const r = await api('/api/jobs', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    setMsg('submitMsg', '已提交，当前排队第 ' + r.queue_position + ' 位', true);
+    document.getElementById('prompt').value = '';
+    me.used_today++;
+    updateQuota();
+    refreshJobs();
+  } catch (e) {
+    setMsg('submitMsg', e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+const STATUS_TEXT = {pending: '排队中', running: '生成中', completed: '已完成', failed: '失败'};
+const ENGINE_TEXT = {turbo: '极速', standard: '品质'};
+
+function fmtTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts * 1000);
+  return d.toLocaleString('zh-CN', {hour12: false});
+}
+
+function renderJob(j) {
+  let extra = '';
+  if (j.status === 'pending' && j.queue_position)
+    extra = '<span>队列第 ' + j.queue_position + ' 位</span>';
+  if (j.status === 'running' && j.elapsed != null)
+    extra = '<span>已生成 ' + Math.floor(j.elapsed / 60) + ' 分 ' + (j.elapsed % 60) + ' 秒</span>';
+  if (j.status === 'failed' && j.error)
+    extra = '<span style="color:var(--danger)">' + j.error + '</span>';
+  if (j.username) extra += '<span>提交人：' + j.username + '</span>';
+  let media = '';
+  if (j.status === 'completed' && j.video_url) {
+    media = '<video controls preload="metadata" src="' + j.video_url + '"></video>' +
+            '<a class="dl" href="' + j.video_url + '" download>下载视频</a>';
+  }
+  return '<div class="job">' +
+    '<div class="prompt">' + escapeHtml(j.prompt) + '</div>' +
+    '<div class="meta">' +
+      '<span class="badge ' + j.status + '">' + STATUS_TEXT[j.status] + '</span>' +
+      '<span class="tag">' + (ENGINE_TEXT[j.engine] || '极速') + ' · ' +
+             j.size.replace('x', '×') + ' · ' + j.seconds + 's</span>' +
+      '<span>' + fmtTime(j.created_at) + '</span>' +
+      extra +
+    '</div>' + media + '</div>';
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+let lastJobsSig = '';
+
+async function refreshJobs() {
+  if (!me) return;
+  // 有视频正在播放时跳过本次刷新，避免重渲染打断播放
+  const vids = document.querySelectorAll('#jobList video');
+  for (const v of vids) { if (!v.paused && !v.ended) return; }
+  try {
+    const data = await api('/api/jobs' + (adminAll ? '?all=1' : ''));
+    // 任务状态无变化时只更新排队信息，不重绘列表（保护播放器和滚动位置）
+    const sig = data.jobs.map(j =>
+      j.id + j.status + (j.queue_position || '') + (j.finished_at || '')).join('|');
+    if (sig !== lastJobsSig) {
+      lastJobsSig = sig;
+      const list = document.getElementById('jobList');
+      list.innerHTML = data.jobs.length ? data.jobs.map(renderJob).join('')
+                                        : '<div class="empty">暂无任务</div>';
+    }
+    document.getElementById('pendingInfo').textContent =
+      data.pending_total ? '（全站排队 ' + data.pending_total + ' 个）' : '';
+  } catch (e) {}
+}
+
+setInterval(refreshJobs, 5000);
+boot();
+</script>
+</body>
+</html>

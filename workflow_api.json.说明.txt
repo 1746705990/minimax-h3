@@ -1,0 +1,11 @@
+把 ComfyUI 里导出的 API 格式工作流重命名为 workflow_api.json 放在本目录。
+
+导出方法：
+1. 浏览器打开 ComfyUI 界面
+2. 加载 MiniMax-H3 官方工作流（ComfyUI 模板库或官方示例页获取）
+3. 设置 (Settings) 里开启 Dev mode Options
+4. 菜单点 "Save (API Format)" 导出
+5. 重命名为 workflow_api.json，覆盖本文件位置
+
+然后打开该 JSON，找到正提示词节点（class_type 为 CLIPTextEncode 或 H3 专用文本节点）
+的顶层键名（如 "6"），填入 config.yaml 的 comfyui.prompt_node_id。

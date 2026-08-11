@@ -1,0 +1,53 @@
+# H3 视频生成服务配置
+site_name: "minimax-h3"
+# 首次启动前务必修改为一串随机字符（用于会话签名）
+secret_key: "PLEASE-CHANGE-ME-to-a-long-random-string"
+
+database: "./data/h3video.db"
+output_dir: "./data/outputs"
+
+# 生成后端：auto（sglang 优先，挂了自动切 comfyui）| sglang | comfyui
+backend: auto
+
+sglang:
+  base_url: "http://127.0.0.1:30010"
+  api_key: "EMPTY"          # sglang serve 默认不校验，填任意值即可
+  timeout_minutes: 90       # 单个视频生成最长等待
+
+comfyui:
+  base_url: "http://127.0.0.1:8188"
+  engines:
+    turbo:                            # 极速引擎：bf16 + Turbo LoRA(ema_V4, merge) + 8 步
+      workflow_file: "./workflow_turbo.json"
+      prompt_node_id: "131"           # MiniMaxH3ImageToVideo
+      prompt_keys: ["prompt", "text"]
+      seed_node_id: "129"             # RandomNoise
+      duration_node_id: "133"         # Float (duration)
+      resolution_node_id: "115"       # ResolutionSelector
+      steps_node_id: "124"            # BasicScheduler，默认用工作流里的 8 步
+      lora_node_id: "134"             # MiniMaxH3TurboLoRA，默认 strength 0.85
+      timeout_minutes: 60             # 实测 15s/0.9MP 约 20 分钟
+    standard:                         # 品质引擎：bf16 + 无 LoRA + res_multistep 20 步
+      workflow_file: "./workflow_standard.json"
+      prompt_node_id: "105:104"
+      prompt_keys: ["prompt", "text"]
+      seed_node_id: "105:15"
+      duration_node_id: "105:111"
+      resolution_node_id: "115"
+      steps_node_id: "105:9"          # BasicScheduler，默认 20 步
+      timeout_minutes: 240            # 15s/0.9MP/20步 可能 3 小时+
+  size_to_megapixels:                 # 两引擎共用：网站档位 → megapixels 值
+    "864x480": 0.4                    # 快速档
+    "1280x736": 0.9                   # 高清档（原生上限内的最高安全档）
+
+# 公开服务控制
+quota_per_day: 0            # 每用户每天可提交任务数；0 = 不限次数
+max_pending_jobs: 100       # 全站排队上限，超过拒绝新任务
+invite_code: ""             # 设置后注册必须填写该邀请码，留空则开放注册
+video_retention_days: 7     # 视频保留天数，过期自动清理
+poll_interval_seconds: 5    # worker 轮询间隔
+
+# 默认生成参数（前端可选范围在 index.html 里配）
+default_size: "864x480"     # 快速档；高清档为 1280x736（原生上限内的最高可选档）
+default_seconds: 5
+max_prompt_length: 4000     # 提示词最大字符数（结构化长提示词建议 4000+）
