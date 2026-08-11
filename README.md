@@ -71,18 +71,66 @@ git clone https://github.com/comfyanonymous/ComfyUI.git
 cd ComfyUI
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-# 3) 下载 MiniMax-H3 模型（预留 150GB+ 磁盘！）
-#    推荐用魔搭，国内速度快：
+# 3) 下载 MiniMax-H3 模型（预留 130GB+ 磁盘！）
 pip install modelscope -i https://pypi.tuna.tsinghua.edu.cn/simple
-#    按 ComfyUI 官方 H3 页面说明，把 transformer / 文本编码器 / VAE
-#    分别放入 models/diffusion_models、models/text_encoders、models/vae
 
-# 4) 启动
-cd ../h3video
-bash start_comfyui.sh
+#    bf16 全精度三件套：仓库内路径自带目录前缀，
+#    --local_dir 指向 models/ 即自动落位，无需手动 mv
+modelscope download --model 'Comfy-Org/MiniMax-H3' \
+  'diffusion_models/minimax_h3_fl2va_bf16.safetensors' \
+  --local_dir /wgb/ComfyUI/models          # 66.3GB → models/diffusion_models/
+
+modelscope download --model 'Comfy-Org/MiniMax-H3' \
+  'text_encoders/qwen3vl_32b_minimax_h3_bf16.safetensors' \
+  --local_dir /wgb/ComfyUI/models          # 51.5GB → models/text_encoders/
+
+modelscope download --model 'Comfy-Org/MiniMax-H3' \
+  'vae/minimax_h3_video_vae_fp16.safetensors' \
+  'vae/minimax_h3_audio_vae_fp32.safetensors' \
+  --local_dir /wgb/ComfyUI/models          # 5.8GB → models/vae/
+
+#    Turbo LoRA（极速引擎用，4 个 checkpoint，共 ~2.4GB）
+modelscope download --model 'larryvrh/MiniMax-H3-Turbo-Lora' \
+  --include '*.safetensors' \
+  --local_dir /wgb/ComfyUI/models/loras
+
+#    Turbo 自定义节点（h3_silu_temb_grid.safetensors 随仓库自带，不用单独下）
+cd /wgb/ComfyUI/custom_nodes
+git clone https://github.com/Larryvrh/ComfyUI-MiniMax-H3-Turbo.git
+#    网络不通走代理：https://ghproxy.net/https://github.com/...
+cd /wgb/h3video
+
+# 4) 完整性校验（大文件必做，safetensors 对字节数敏感）
+cd /wgb/ComfyUI/models
+sha256sum diffusion_models/minimax_h3_fl2va_bf16.safetensors
+#    应为 907d4add438438ec1544f5240c3b38532ed934fe6be75677a6bbda2a6fdd6182
+sha256sum text_encoders/qwen3vl_32b_minimax_h3_bf16.safetensors
+#    应为 600d567f6a9629c8574e8e7041b199bdd9c59a986afa7906910a81919610607d
+
+#    LoRA 校验（若报 "file not fully covered" 多为尾部填充字节，
+#    用 python 对比「8+头长+声明数据区」与实际大小，多了截掉即可）
+python3 -c "
+from safetensors import safe_open
+import glob
+for f in sorted(glob.glob('/wgb/ComfyUI/models/loras/*.safetensors')):
+    with safe_open(f, framework='pt') as sf:
+        print('OK', f, len(sf.keys()), 'tensors')
+"
+
+# 5) 目录结构验证
+ls /wgb/ComfyUI/models/diffusion_models/   # minimax_h3_fl2va_bf16.safetensors
+ls /wgb/ComfyUI/models/text_encoders/      # qwen3vl_32b_minimax_h3_bf16.safetensors
+ls /wgb/ComfyUI/models/vae/                # 视频 fp16 + 音频 fp32 两个 VAE
+ls /wgb/ComfyUI/models/loras/              # 4 个 Turbo LoRA
+ls /wgb/ComfyUI/custom_nodes/ComfyUI-MiniMax-H3-Turbo/
+
+# 6) 启动（注意：ComfyUI 只在启动时加载自定义节点，装完 Turbo 节点必须重启）
+cd /wgb/h3video
+bash start_comfyui.sh        # 内含 --use-sage-attention
 curl http://127.0.0.1:8188/system_stats     # 验证
+curl http://127.0.0.1:8188/object_info/MiniMaxH3TurboLoRA   # Turbo 节点已注册
 
-# 5) 工作流（已内置两份，开箱即用）
+# 7) 工作流（已内置两份，开箱即用）
 #    workflow_turbo.json    极速引擎：bf16 + Turbo LoRA(ema_V4, merge) + 8 步
 #    workflow_standard.json 品质引擎：bf16 + 无 LoRA + res_multistep 20 步
 #    config.yaml 的 comfyui.engines 里已按这两份工作流预填好全部节点 ID。
@@ -93,8 +141,8 @@ curl http://127.0.0.1:8188/system_stats     # 验证
 
 | 引擎 | 技术组合 | 5s/0.9MP 参考耗时 | 适用 |
 |---|---|---|---|
-| ⚡ turbo（默认）| bf16 + Turbo LoRA 8步 strength 0.85 | ~6~8 分钟 | 日常生成、草稿 |
-| 💎 standard | bf16 + 标准 20 步 | ~45 分钟 | 终稿、最高画质 |
+| turbo（默认）| bf16 + Turbo LoRA 8步 strength 0.85 | ~6~8 分钟 | 日常生成、草稿 |
+| standard | bf16 + 标准 20 步 | ~45 分钟 | 终稿、最高画质 |
 
 时长 5/10/15 秒均可（15 秒约 3 倍耗时；bf16 权重下 15 秒有声已验证稳定）。
 分辨率 864×480(0.4MP) / 1280×736(0.9MP)。失败自动换种子重试 1 次。
