@@ -76,9 +76,3 @@ SQLite 数据库（config.yaml 的 `database`）务必放在**容器本地盘**�
 → 确认端口释放 → 启动 → 轮询等就绪（失败自动 tail 日志）。
 直接 `bash start_comfyui.sh` 即可完成重启，无需手动 kill。
 日志固定写到脚本所在目录的 `logs/comfyui.log`。
-
-实时查看推理进度（进度条是回车符刷新，需转换）：
-
-```bash
-tail -f logs/comfyui.log | tr '\r' '\n' | grep --line-buffered -E "got prompt|steps|s/it|executed|Error"
-```
