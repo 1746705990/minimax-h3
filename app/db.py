@@ -1,4 +1,9 @@
-"""SQLite 数据层：用户、会话、任务。WAL 模式支持 web/worker 双进程并发。"""
+"""SQLite 数据层：用户、会话、任务。WAL 模式支持 web/worker 双进程并发。
+
+注意：数据库放在 GPFS 等网络文件系统上时，WAL 的文件锁可能以
+"database is locked" 立即失败的形式抛出，因此所有写操作都经过
+_locked_retry 重试包装，并设置 busy_timeout 兜底。
+"""
 import sqlite3
 import threading
 import time
@@ -7,6 +12,17 @@ import uuid
 from .config import CFG
 
 _local = threading.local()
+
+
+def _locked_retry(fn, retries=12, interval=5.0):
+    """遇到 database is locked 时重试（GPFS/网络盘上 WAL 锁常见）。"""
+    for i in range(retries):
+        try:
+            return fn()
+        except sqlite3.OperationalError as e:
+            if "locked" not in str(e).lower() or i == retries - 1:
+                raise
+            time.sleep(interval)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -44,8 +60,9 @@ CREATE INDEX IF NOT EXISTS idx_jobs_user ON jobs(user_id, created_at);
 
 def conn():
     if not hasattr(_local, "c") or _local.c is None:
-        _local.c = sqlite3.connect(CFG["database"], timeout=30)
+        _local.c = sqlite3.connect(CFG["database"], timeout=60)
         _local.c.row_factory = sqlite3.Row
+        _local.c.execute("PRAGMA busy_timeout=60000")
         _local.c.execute("PRAGMA journal_mode=WAL")
     return _local.c
 
@@ -65,10 +82,10 @@ def create_user(username, password_hash):
     c = conn()
     is_admin = 1 if c.execute("SELECT COUNT(*) n FROM users").fetchone()["n"] == 0 else 0
     try:
-        cur = c.execute(
+        cur = _locked_retry(lambda: c.execute(
             "INSERT INTO users(username, password_hash, is_admin, created_at) VALUES (?,?,?,?)",
-            (username, password_hash, is_admin, time.time()))
-        c.commit()
+            (username, password_hash, is_admin, time.time())))
+        _locked_retry(c.commit)
         return cur.lastrowid, is_admin
     except sqlite3.IntegrityError:
         return None, 0
@@ -84,9 +101,9 @@ def get_user_by_id(uid):
 
 def create_session(user_id, days=7):
     token = uuid.uuid4().hex + uuid.uuid4().hex
-    conn().execute("INSERT INTO sessions VALUES (?,?,?)",
-                   (token, user_id, time.time() + days * 86400))
-    conn().commit()
+    _locked_retry(lambda: conn().execute("INSERT INTO sessions VALUES (?,?,?)",
+                   (token, user_id, time.time() + days * 86400)))
+    _locked_retry(conn().commit)
     return token
 
 
@@ -100,8 +117,8 @@ def get_session_user(token):
 
 
 def delete_session(token):
-    conn().execute("DELETE FROM sessions WHERE token=?", (token,))
-    conn().commit()
+    _locked_retry(lambda: conn().execute("DELETE FROM sessions WHERE token=?", (token,)))
+    _locked_retry(conn().commit)
 
 
 def list_users_with_stats():
@@ -122,11 +139,11 @@ def new_job_id():
 
 def create_job(user, prompt, size, seconds, engine="turbo"):
     jid = new_job_id()
-    conn().execute(
+    _locked_retry(lambda: conn().execute(
         "INSERT INTO jobs(id,user_id,username,prompt,size,seconds,engine,status,created_at) "
         "VALUES (?,?,?,?,?,?,?,'pending',?)",
-        (jid, user["id"], user["username"], prompt, size, seconds, engine, time.time()))
-    conn().commit()
+        (jid, user["id"], user["username"], prompt, size, seconds, engine, time.time())))
+    _locked_retry(conn().commit)
     return jid
 
 
@@ -170,26 +187,27 @@ def claim_next_job():
         "SELECT id FROM jobs WHERE status='pending' ORDER BY created_at LIMIT 1").fetchone()
     if not row:
         return None
-    cur = c.execute(
+    cur = _locked_retry(lambda: c.execute(
         "UPDATE jobs SET status='running', started_at=? WHERE id=? AND status='pending'",
-        (time.time(), row["id"]))
-    c.commit()
+        (time.time(), row["id"])))
+    _locked_retry(c.commit)
     if cur.rowcount == 0:
         return None
     return get_job(row["id"])
 
 
 def finish_job(job_id, ok, backend="", video_file="", error=""):
-    conn().execute(
+    _locked_retry(lambda: conn().execute(
         "UPDATE jobs SET status=?, backend=?, video_file=?, error=?, finished_at=? WHERE id=?",
-        ("completed" if ok else "failed", backend, video_file, error, time.time(), job_id))
-    conn().commit()
+        ("completed" if ok else "failed", backend, video_file, error, time.time(), job_id)))
+    _locked_retry(conn().commit)
 
 
 def recover_running():
     """启动时把上次遗留的 running 任务放回队列"""
-    conn().execute("UPDATE jobs SET status='pending', started_at=0 WHERE status='running'")
-    conn().commit()
+    _locked_retry(lambda: conn().execute(
+        "UPDATE jobs SET status='pending', started_at=0 WHERE status='running'"))
+    _locked_retry(conn().commit)
 
 
 def cleanup_old_videos(output_dir, retention_days):
