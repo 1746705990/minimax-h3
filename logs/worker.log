@@ -1,3 +1,1 @@
-2026-08-11 20:46:45,000 [worker] INFO worker 启动，backend=auto，输出目录=/wgb/h3video/./data/outputs
-2026-08-11 20:46:45,006 [worker] INFO 使用后端: comfyui (engine=standard)
-2026-08-11 20:46:45,006 [worker] INFO 任务 20260811-629553ac13 开始，后端=comfyui-standard，提示词=15秒，无描边的二维色块矢量流体MG动画，纯色大色块，无勾线、无黑色轮廓、无渐变...
+
