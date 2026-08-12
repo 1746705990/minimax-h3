@@ -1,0 +1,16 @@
+# 用户
+bash manage.sh users                  # 用户列表：ID/管理员/注册时间/任务数/完成数
+bash manage.sh passwd alice           # 重置密码（输入不显示，自动踢掉登录态）
+bash manage.sh admin alice            # 设为管理员（off 取消）
+bash manage.sh deluser alice          # 删用户及其任务记录（有确认，视频保留）
+
+# 任务
+bash manage.sh jobs                   # 全站最近 50 条任务
+bash manage.sh jobs alice             # 只看 alice 的
+bash manage.sh job 20260812-xxx       # 详情：状态/视频/报错/提示词
+bash manage.sh retry 20260812-xxx     # 失败/卡死任务重新排队（仅限 failed/running）
+bash manage.sh clean-running          # 所有卡死 running 一键重置
+bash manage.sh deljob 20260812-xxx --with-video   # 删记录连带删视频
+
+# 概览
+bash manage.sh stats                  # 状态分布/今日提交/存储占用
