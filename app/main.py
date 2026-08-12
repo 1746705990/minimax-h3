@@ -26,6 +26,17 @@ def index():
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
 
+@app.get("/{filename}.txt")
+def verify_txt(filename: str):
+    """站点验证文件：仅放行项目根目录下 32 位 hex 命名的 txt"""
+    if not all(c in "0123456789abcdef" for c in filename) or len(filename) != 32:
+        return JSONResponse({"detail": "Not Found"}, status_code=404)
+    path = os.path.join(ROOT, filename + ".txt")
+    if not os.path.isfile(path):
+        return JSONResponse({"detail": "Not Found"}, status_code=404)
+    return FileResponse(path, media_type="text/plain")
+
+
 # ---------- 认证 ----------
 
 class AuthIn(BaseModel):
